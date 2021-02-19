@@ -1,0 +1,5 @@
+# Specific files ##
+*.asv
+
+# Directories
+data
