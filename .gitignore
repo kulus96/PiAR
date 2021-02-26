@@ -3,3 +3,6 @@
 
 # Directories
 data
+
+# For Macs
+*.DS_Store
