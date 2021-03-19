@@ -1,5 +1,6 @@
 # Specific files ##
 *.asv
+*.slxc
 
 # Directories
 data
