@@ -122,18 +122,20 @@ disp('== Done estimating forces ===');
 %%
 % Estimate friction coefficients
 % x0 = [mu_s, mu_c, v0, nabla]
-x0 = [1, 1, 0.1, 0.1]';
+x0 = [0.1, 0.1, 0.1, 0.1]';
 %F_n v F_fric
 xdata = [F_normals(200:300,:) vel_tcp(200:300), F_frictions(200:300,:)];
-ydata = zeros(length(xdata),4);
-options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt','Diagnostics','on','Display','iter');
-lb = [0 0 0 0];
-ub = [1 1 1000 1];
+ydata = zeros(length(xdata),1);
+options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt','Diagnostics','on','Display','iter', 'MaxIterations', 100);
+lb = [];
+ub = [];
 tic;
 [x_,resnorm,residual,exitflag,output,lambda,jacobian] = lsqcurvefit(@g_func,x0,xdata, ydata, lb, ub, options);
 display(toc)
+display(x_)
 
-
+% Stribeck GUESSstimation: 0.0331
+%mu_str = vel_tcp(80)*sqrt(2);
 
 %% Plot contact point
 close all;
