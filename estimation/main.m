@@ -30,18 +30,20 @@ out = sim('../simulation/finger', time_simulation);
 %%
 torque_sensor = out.Torque;
 force_sensor = out.Force;
-%vel = out.vel.Data;
+vel = out.vel.Data;
 F_friction_GT = out.F_friction;
 F_normal_GT = out.F_normal;
 cusum_trigger = out.cusum_trigger;
 
 force_sensor = force_sensor(logical(cusum_trigger), :);
 torque_sensor = torque_sensor(logical(cusum_trigger), :);
+F_friction_GT = F_friction_GT(logical(cusum_trigger), :);
+vel = vel(logical(cusum_trigger));
 
 % Change format of data
 forces_tcp = force_sensor(1:4:end,:)';
 moments_tcp = torque_sensor(1:4:end,:)';
-%vel_tcp = vel(200:4:500); 
+vel_tcp = vel(1:4:end); 
 
 %% Estimate contact point
 % Surface parameters
@@ -117,6 +119,21 @@ end
 disp('== Done estimating forces ===');
 
 
+%%
+% Estimate friction coefficients
+% x0 = [mu_s, mu_c, v0, nabla]
+x0 = [1, 1, 0.1, 0.1]';
+%F_n v F_fric
+xdata = [F_normals(200:300,:) vel_tcp(200:300), F_frictions(200:300,:)];
+ydata = zeros(length(xdata),4);
+options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt','Diagnostics','on','Display','iter');
+lb = [0 0 0 0];
+ub = [1 1 1000 1];
+tic;
+[x_,resnorm,residual,exitflag,output,lambda,jacobian] = lsqcurvefit(@g_func,x0,xdata, ydata, lb, ub, options);
+display(toc)
+
+
 
 %% Plot contact point
 close all;
@@ -162,5 +179,9 @@ plot(F_frictions,'.')
 hold on
 plot(F_friction_GT(1:4:end,:)*0.001,'o')
 hold off
+title('Friction force')
+xlabel('Time [ms]')
+ylabel('Force [N]')
+legend('Estimated friction force', 'Ground truth')
 
 
