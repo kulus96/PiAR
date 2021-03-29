@@ -2,6 +2,7 @@
 *.asv
 *.slxc
 *.autosave
+*.mat
 
 # Directories
 data

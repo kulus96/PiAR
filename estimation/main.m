@@ -24,6 +24,8 @@ revolute_x = 0; % [rad]
 F_push = -5;
 climit = 28; % 'threshold for cusum'
 
+F_push = -5;
+climit = 28; % 'threshold for cusum'
 
 %% Run simulation
 out = sim('../simulation/finger', time_simulation);
@@ -92,7 +94,7 @@ options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt');
 for i = 1:length(forces_tcp)
     f = forces_tcp(:,i);
     m = moments_tcp(:,i);
-    
+
     % Analytical solution on a sphere
     fm_ratio(i)= f'*m;
     tic
@@ -102,7 +104,7 @@ for i = 1:length(forces_tcp)
     y_cord(i) = c_sph(2);
     z_cord(i) = c_sph(3);
     k(i) = k_sph;
-    
+
     % Numerical solution using the Levenberg-Marquardt method
     ydata = zeros(4,1);
     x0 = [[0;0;10.0]; k_sph]; % Initial guess
@@ -114,12 +116,12 @@ for i = 1:length(forces_tcp)
     y_iter_cord(i) = x(2);
     z_iter_cord(i) = x(3);
     k_iter(i) = x(4);
-    
+
     % Estimate friction force
     P_c = [x(1),x(2),x(3)]';
-    [F_normal, F_friction, F_friction2] = estimateFriction(P_c,f,S);
+    [F_normal, F_friction, F_friction] = estimateFriction(P_c,f,S);
     F_normals(i) = norm(F_normal);
-    F_frictions(i) = norm(F_friction);      
+    F_frictions(i) = norm(F_friction);
 end
 disp('== Done estimating forces ===');
 
@@ -133,12 +135,10 @@ x0 = [0, 0.7, 0, 0]';
 n_data = 50;
 n_start = 300;
 xdata = [F_normals(n_start:n_start+n_data,:), vel_tcp(n_start:n_start+n_data), F_frictions(n_start:n_start+n_data,:)];
-ydata = zeros(length(xdata), 1);
-
-options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt', 'PlotFcn', 'optimplotx', 'Diagnostics','on','Display','iter-detailed', 'MaxIterations', 100);
-lb = [];    % upper bound
-ub = [];    % lower bound
-
+ydata = zeros(length(xdata),1);
+options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt', 'FunctionTolerance', 1e-6 ,'PlotFcn', 'optimplotx', 'UseParallel', true,'Diagnostics','on','Display','iter-detailed');%, 'MaxIterations', 100)
+lb = [0 0 0 0]; % upper bound
+ub = [];        % lower bound
 tic;
 [x_, resnorm, residual, exitflag, output, lambda, jacobian] = lsqcurvefit(@g_func, x0, xdata, ydata, lb, ub, options);
 display(toc)
@@ -196,6 +196,19 @@ xlabel('Time [ms]')
 ylabel('Force [N]')
 legend('Estimated friction force', 'Ground truth')
 
+%% velocity vs. friction ratio
+F_ratio = zeros(length(F_normals),1);
+for i = 1:length(F_normals)
+    F_ratio(i) = F_frictions(i) / F_normals(i);
+
+end
+
+figure(6)
+plot(vel_tcp(100:end), F_ratio(100:end))
+hold on
+plot(vel_tcp(100:end), movmean(F_ratio(100:end), 50), 'black')
+xlabel('Velocity [m/s]')
+ylabel('Friction ratio')
 
 figure(6)
 plot(F_frictions-F_friction_GT,'r*')
@@ -203,6 +216,13 @@ title('Friction error')
 xlabel('Time [ms]')
 ylabel('Force [N]')
 
+%% Plot velocity
+figure(7)
+plot(vel_tcp)
 
-
-
+%%
+% x0 = [0.1, 0.1, 0.1, 0.1]';
+% %F_n v F_fric
+% xdata = [F_normals(200:300,:) vel_tcp(200:300), F_frictions(200:300,:)];
+%
+% P = LM_func(x0,xdata)
