@@ -41,10 +41,6 @@ F_friction_GT = F_friction_GT(logical(cusum_trigger), :);
 F_normal_GT = F_normal_GT(logical(cusum_trigger),:);
 vel = vel(logical(cusum_trigger));
 
-% Change format of data
-forces_tcp = force_sensor(1:4:end,:)';
-moments_tcp = torque_sensor(1:4:end,:)';
-vel_tcp = vel(1:4:end);
 %%Generate data
 % data source: https://engineeringlibrary.org/reference/coefficient-of-friction
 mu_s = [0.78, 0.74, 0.95, 0.61, 0.53, 1.10 ,0.51, 0.85, 1.05, 1.05, 0.94, 0.62, 0.54, 0.61];
