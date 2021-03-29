@@ -6,11 +6,11 @@ close all;
 % Load finger tip sketch
 load('../simulation/quarter_circle.mat')
 
-time_simulation = 4; % [s]
+time_simulation = 8; % [s]
 g_0 = 0; % -9.82;
 dim_block = [0.7, 0.2, 0.02]; % width, depth, height [m]
 friction_static = 0.5; % default 0.5
-friction_dynamic = 0.7; % default 0.3
+friction_dynamic = 0.3; % default 0.3
 radius_finger = 0.031; % [m]
 length_finger = 0.05; % [m] only for cylinder
 t_sample = 0.001; % [s]
@@ -21,11 +21,9 @@ robot_width = 0.6; % [m]
 size_strut = 45 * 10^-3; % [m]
 revolute_y = pi/4; % [rad]
 revolute_x = 0; % [rad]
-F_push = -5;
+F_push = -2;
 climit = 28; % 'threshold for cusum'
 
-F_push = -5;
-climit = 28; % 'threshold for cusum'
 
 %% Run simulation
 out = sim('../simulation/finger', time_simulation);
@@ -50,7 +48,7 @@ n_th = 4;
 forces_tcp = force_sensor(1:n_th:end,:)';
 moments_tcp = torque_sensor(1:n_th:end,:)';
 vel_tcp = vel(1:n_th:end);
-F_friction_GT = F_friction_GT(1:4:end,:);
+F_friction_GT = F_friction_GT(1:n_th:end,:);
 
 %% Estimate contact point
 % Surface parameters
@@ -119,33 +117,48 @@ for i = 1:length(forces_tcp)
 
     % Estimate friction force
     P_c = [x(1),x(2),x(3)]';
-    [F_normal, F_friction, F_friction] = estimateFriction(P_c,f,S);
+    [F_normal, F_friction, F_friction2] = estimateFriction(P_c,f,S);
     F_normals(i) = norm(F_normal);
     F_frictions(i) = norm(F_friction);
 end
 disp('== Done estimating forces ===');
 
 
-%%
+%% Old method
 % Estimate friction coefficients
 % x0 = [mu_s, mu_c, v0, nabla]
-x0 = [0, 0.7, 0, 0]';
+x0 = [0.5, 0.3, 0.01, 0.1]';
 %F_n v F_fric
 
-n_data = 50;
+n_data = 500;%length(F_normals)-300;
 n_start = 300;
 xdata = [F_normals(n_start:n_start+n_data,:), vel_tcp(n_start:n_start+n_data), F_frictions(n_start:n_start+n_data,:)];
 ydata = zeros(length(xdata),1);
 options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt', 'FunctionTolerance', 1e-6 ,'PlotFcn', 'optimplotx', 'UseParallel', true,'Diagnostics','on','Display','iter-detailed');%, 'MaxIterations', 100)
-lb = [0 0 0 0]; % upper bound
+lb = [];%0 0 0 0]; % upper bound
 ub = [];        % lower bound
 tic;
 [x_, resnorm, residual, exitflag, output, lambda, jacobian] = lsqcurvefit(@g_func, x0, xdata, ydata, lb, ub, options);
 display(toc)
 display(x_)
 
-% Stribeck GUESSstimation: 0.0331
+% Stribeck GUESSstimation: 0.0014
 % mu_str = vel_tcp(80)*sqrt(2);
+
+%% Method 2: Papers implementation of LM-method
+
+x0 = [0.9, 0.9, 0.001, 0.0]';
+%F_n v F_fric
+
+n_data = 500;%length(F_normals)-300;
+n_start = 300;
+xdata = [F_normals(n_start:n_start+n_data,:), vel_tcp(n_start:n_start+n_data), F_frictions(n_start:n_start+n_data,:)];
+%[x_, resnorm, residual, exitflag, output, lambda, jacobian] = lsqcurvefit(@LM_func, x0, xdata, ydata, lb, ub, options);
+[P, error] = LM_func(x0, xdata);
+display(P(end,:))
+
+
+
 
 %% Plot contact point
 close all;
@@ -204,20 +217,24 @@ for i = 1:length(F_normals)
 end
 
 figure(6)
-plot(vel_tcp(100:end), F_ratio(100:end))
+plot(vel_tcp(1:end/2), F_ratio(1:end/2), vel_tcp(end/2+1:end), F_ratio(end/2+1:end))
 hold on
-plot(vel_tcp(100:end), movmean(F_ratio(100:end), 50), 'black')
+
+plot(vel_tcp(1:end), movmean(F_ratio(1:end), 50), 'black')
+%plot(vel_tcp(1:end), F_ratio(
 xlabel('Velocity [m/s]')
 ylabel('Friction ratio')
 
-figure(6)
+%% plot friction error
+
+figure(7)
 plot(F_frictions-F_friction_GT,'r*')
 title('Friction error')
 xlabel('Time [ms]')
 ylabel('Force [N]')
 
 %% Plot velocity
-figure(7)
+figure(8)
 plot(vel_tcp)
 
 %%
