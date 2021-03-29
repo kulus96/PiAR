@@ -10,7 +10,7 @@ time_simulation = 4; % [s]
 g_0 = 0; % -9.82;
 dim_block = [0.7, 0.2, 0.02]; % width, depth, height [m]
 friction_static = 0.5; % default 0.5
-friction_dynamic = 0.3; % default 0.3
+friction_dynamic = 0.7; % default 0.3
 radius_finger = 0.031; % [m]
 length_finger = 0.05; % [m] only for cylinder
 t_sample = 0.001; % [s]
@@ -21,13 +21,14 @@ robot_width = 0.6; % [m]
 size_strut = 45 * 10^-3; % [m]
 revolute_y = pi/4; % [rad]
 revolute_x = 0; % [rad]
+F_push = -5;
+climit = 28; % 'threshold for cusum'
 
-climit = 5; % 'threshold for cusum'
 
+%% Run simulation
+out = sim('../simulation/finger', time_simulation);
 
 %% Load data
-out = sim('../simulation/finger', time_simulation);
-%%
 torque_sensor = out.Torque;
 force_sensor = out.Force;
 vel = out.vel.Data;
@@ -35,19 +36,23 @@ F_friction_GT = out.F_friction;
 F_normal_GT = out.F_normal;
 cusum_trigger = out.cusum_trigger;
 
+% Apply cusum trigger
 force_sensor = force_sensor(logical(cusum_trigger), :);
 torque_sensor = torque_sensor(logical(cusum_trigger), :);
 F_friction_GT = F_friction_GT(logical(cusum_trigger), :);
 vel = vel(logical(cusum_trigger));
+F_normal_GT = F_normal_GT(logical(cusum_trigger), :);
 
-% Change format of data
-forces_tcp = force_sensor(1:4:end,:)';
-moments_tcp = torque_sensor(1:4:end,:)';
-vel_tcp = vel(1:4:end); 
+% Down sample data by every n_th
+n_th = 4;
+forces_tcp = force_sensor(1:n_th:end,:)';
+moments_tcp = torque_sensor(1:n_th:end,:)';
+vel_tcp = vel(1:n_th:end);
+F_friction_GT = F_friction_GT(1:4:end,:);
 
 %% Estimate contact point
 % Surface parameters
-R = 31;
+R = 31 * 10^-3; % [m]
 A = eye(3);
 A(3,3)=1;
 
@@ -77,8 +82,8 @@ execution_time_analytical = zeros(1, length(forces_tcp));
 execution_time_numerical = zeros(1, length(forces_tcp));
 
 % Functions for the numerical method
-S = @(p)p(1)^2+p(2)^2+(p(3)-dz)^2-r^2; % Anon Func
-g = @(x0, xdata)[cross(xdata(1:3),x0(1:3))+x0(4)*gradient(S(x0(1:3)))-xdata(4:6); S(x0(1:3))];  
+S = @(p)p(1)^2+p(2)^2+(p(3)-dz)^2-r^2; % Function for sphere surface
+g = @(x0, xdata)[cross(xdata(1:3),x0(1:3)) + x0(4)*gradient(S(x0(1:3))) - xdata(4:6); S(x0(1:3))]; % Objective fucntion for moments and dist to surface
 
 
 options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt');
@@ -122,20 +127,25 @@ disp('== Done estimating forces ===');
 %%
 % Estimate friction coefficients
 % x0 = [mu_s, mu_c, v0, nabla]
-x0 = [0.1, 0.1, 0.1, 0.1]';
+x0 = [0, 0.7, 0, 0]';
 %F_n v F_fric
-xdata = [F_normals(200:300,:) vel_tcp(200:300), F_frictions(200:300,:)];
-ydata = zeros(length(xdata),1);
-options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt','Diagnostics','on','Display','iter', 'MaxIterations', 100);
-lb = [];
-ub = [];
+
+n_data = 50;
+n_start = 300;
+xdata = [F_normals(n_start:n_start+n_data,:), vel_tcp(n_start:n_start+n_data), F_frictions(n_start:n_start+n_data,:)];
+ydata = zeros(length(xdata), 1);
+
+options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt', 'PlotFcn', 'optimplotx', 'Diagnostics','on','Display','iter-detailed', 'MaxIterations', 100);
+lb = [];    % upper bound
+ub = [];    % lower bound
+
 tic;
-[x_,resnorm,residual,exitflag,output,lambda,jacobian] = lsqcurvefit(@g_func,x0,xdata, ydata, lb, ub, options);
+[x_, resnorm, residual, exitflag, output, lambda, jacobian] = lsqcurvefit(@g_func, x0, xdata, ydata, lb, ub, options);
 display(toc)
 display(x_)
 
 % Stribeck GUESSstimation: 0.0331
-%mu_str = vel_tcp(80)*sqrt(2);
+% mu_str = vel_tcp(80)*sqrt(2);
 
 %% Plot contact point
 close all;
@@ -179,11 +189,20 @@ ylabel('Time [s]')
 figure(5)
 plot(F_frictions,'.')
 hold on
-plot(F_friction_GT(1:4:end,:)*0.001,'o')
+plot(F_friction_GT,'o')
 hold off
 title('Friction force')
 xlabel('Time [ms]')
 ylabel('Force [N]')
 legend('Estimated friction force', 'Ground truth')
+
+
+figure(6)
+plot(F_frictions-F_friction_GT,'r*')
+title('Friction error')
+xlabel('Time [ms]')
+ylabel('Force [N]')
+
+
 
 
