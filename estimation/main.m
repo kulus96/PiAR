@@ -22,7 +22,8 @@ size_strut = 45 * 10^-3; % [m]
 revolute_y = pi/4; % [rad]
 revolute_x = 0; % [rad]
 
-climit = 5; % 'threshold for cusum'
+F_push = -5;
+climit = 28; % 'threshold for cusum'
 
 
 %% Load data
@@ -47,7 +48,7 @@ vel_tcp = vel(1:4:end);
 
 %% Estimate contact point
 % Surface parameters
-R = 31;
+R = 31*10^(-3);
 A = eye(3);
 A(3,3)=1;
 
@@ -112,7 +113,7 @@ for i = 1:length(forces_tcp)
     
     % Estimate friction force
     P_c = [x(1),x(2),x(3)]';
-    [F_normal, F_friction, F_friction2] = estimateFriction(P_c,f,S);
+    [F_normal, F_friction, F_friction] = estimateFriction(P_c,f,S);
     F_normals(i) = norm(F_normal);
     F_frictions(i) = norm(F_friction);      
 end
@@ -124,10 +125,10 @@ disp('== Done estimating forces ===');
 % x0 = [mu_s, mu_c, v0, nabla]
 x0 = [0.1, 0.1, 0.1, 0.1]';
 %F_n v F_fric
-xdata = [F_normals(200:300,:) vel_tcp(200:300), F_frictions(200:300,:)];
+xdata = [F_normals(300:end,:), vel_tcp(300:end), F_frictions(300:end,:)];
 ydata = zeros(length(xdata),1);
-options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt','Diagnostics','on','Display','iter', 'MaxIterations', 100);
-lb = [];
+options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt', 'FunctionTolerance', 1e-6 ,'PlotFcn', 'optimplotx', 'UseParallel', true,'Diagnostics','on','Display','iter-detailed');%, 'MaxIterations', 100)
+lb = [0 0 0 0];
 ub = [];
 tic;
 [x_,resnorm,residual,exitflag,output,lambda,jacobian] = lsqcurvefit(@g_func,x0,xdata, ydata, lb, ub, options);
@@ -186,4 +187,28 @@ xlabel('Time [ms]')
 ylabel('Force [N]')
 legend('Estimated friction force', 'Ground truth')
 
+%% velocity vs. friction ratio
+F_ratio = zeros(length(F_normals),1);
+for i = 1:length(F_normals)
+    F_ratio(i) = F_frictions(i) / F_normals(i);
+    
+end
 
+figure(6)
+plot(vel_tcp(100:end), F_ratio(100:end))
+hold on
+plot(vel_tcp(100:end), movmean(F_ratio(100:end), 50), 'black')
+xlabel('Velocity [m/s]')
+ylabel('Friction ratio')
+
+%% Plot velocity
+figure(7)
+plot(vel_tcp)
+
+
+%%
+% x0 = [0.1, 0.1, 0.1, 0.1]';
+% %F_n v F_fric
+% xdata = [F_normals(200:300,:) vel_tcp(200:300), F_frictions(200:300,:)];
+% 
+% P = LM_func(x0,xdata)
