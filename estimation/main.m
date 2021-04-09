@@ -24,7 +24,6 @@ revolute_x = 0; % [rad]
 F_push = -10; %-2
 climit = 28; % 'threshold for cusum'
 
-
 %% Run simulation
 out = sim('../simulation/finger', time_simulation);
 
@@ -39,16 +38,17 @@ cusum_trigger = out.cusum_trigger;
 % Apply cusum trigger
 force_sensor = force_sensor(logical(cusum_trigger), :);
 torque_sensor = torque_sensor(logical(cusum_trigger), :);
-F_friction_GT = F_friction_GT(logical(cusum_trigger), :);
+F_friction_GT1 = F_friction_GT(logical(cusum_trigger), :);
 vel = vel(logical(cusum_trigger));
 F_normal_GT = F_normal_GT(logical(cusum_trigger), :);
 
 % Down sample data by every n_th
-n_th = 4;
+n_th = 8;
 forces_tcp = force_sensor(1:n_th:end,:)';
 moments_tcp = torque_sensor(1:n_th:end,:)';
 vel_tcp = vel(1:n_th:end);
-F_friction_GT = F_friction_GT(1:n_th:end,:);
+F_friction_GT = F_friction_GT1(1:n_th:end,:);
+
 
 %% Estimate contact point
 % Surface parameters
@@ -124,7 +124,30 @@ end
 disp('== Done estimating forces ===');
 
 
-%% Old method
+%% model check (based on eq.5)
+
+napla = 0;
+v0 = 10^-3 * sqrt(2);
+
+mu_s = friction_static;
+mu_c = friction_dynamic;
+
+Fn = F_normal_GT;
+v = vel;
+F = F_friction_GT1;
+
+g_mat = zeros(length(vel),1);
+
+for i = 1:length(vel)
+%g_mat(i) = mu_c + (mu_s - mu_c) * exp(-(v(i) / v0)^2)  - F(i) / Fn(i);
+    g_mat(i) = mu_c + (mu_s - mu_c) * exp(-(v(i) / v0)^2) + napla * (v(i) / Fn(i)) - F(i) / Fn(i);
+end
+figure(9)
+plot(g_mat)
+ylabel('Error')
+xlabel('Time [ms]')
+
+%%
 % Estimate friction coefficients
 % x0 = [mu_s, mu_c, v0, nabla]
 %x0 = [0.5, 0.3, 0.01, 0.1]';
@@ -249,8 +272,6 @@ plot(vel_tcp(1:end), movmean(F_ratio(1:end), 50), 'black')
 %plot(vel_tcp(1:end), F_ratio(
 xlabel('Velocity [m/s]')
 ylabel('Friction ratio')
-
-%% plot friction error
 
 figure(7)
 plot(F_frictions-F_friction_GT,'r*')
