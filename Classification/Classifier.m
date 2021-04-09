@@ -14,7 +14,7 @@ mu_c = [0.42, 0.57, 0.95, 0.47, 0.36, 0.53 ,0.44, 0.21, 0.29, 1.40, 0.40, 0.48, 
 stribeck_coef = zeros(1,length(mu_c)); % should be set to the correct values when a working estimator is avaliable.
 viscosity_coef = zeros(1,length(mu_c));
 %surface_properties = [surface_prop_nn, zeros(length(surface_prop_nn),2)];
-surface_properties = [surface_prop_mlrm, zeros(length(surface_prop_nn),2)];
+surface_properties = [surface_prop_mlrm, zeros(length(surface_prop_mlrm),2)];
 
 classes = [mu_s', mu_c', stribeck_coef', viscosity_coef'];
 [idx, list] = knnsearch(classes, surface_properties);

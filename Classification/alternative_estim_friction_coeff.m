@@ -12,7 +12,7 @@ LABEL = [];
 
 % Training set
 for i = 1: size(files,1)-1
-	[force, torque, vel, X, X, mu_static, mu_dyn, label]= loadRawData(strcat(files(i).folder,'\', files(i).name), 1, true);
+	[force, torque, vel, ~, ~, mu_static, mu_dyn, label]= loadRawData(strcat(files(i).folder,'/', files(i).name), 1, true);
 	l = int16(length(force)/6);
 	% removes the first and last 1/6  of obtained data
 	% finger 'should' move in this "section"
@@ -25,7 +25,7 @@ for i = 1: size(files,1)-1
 	MU_DYNAMIC = [MU_DYNAMIC; mu_dyn];
 end
 % test set
-[force, torque, vel, X, X, mu_static, mu_dyn]= loadRawData(strcat(files(size(files,1)).folder,'\', files(size(files,1)).name), 1, true);
+[force, torque, vel, ~, ~, mu_static, mu_dyn]= loadRawData(strcat(files(size(files,1)).folder,'/', files(size(files,1)).name), 1, true);
 l = int16(length(force)/6);
 test_FORCES=force(:,l:end-l);
 test_TORQUES=torque(:,l:end-l);
