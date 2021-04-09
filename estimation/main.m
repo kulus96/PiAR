@@ -9,8 +9,8 @@ load('../simulation/quarter_circle.mat')
 time_simulation = 10.5; % [s]
 g_0 = 0; % -9.82;
 dim_block = [0.7, 0.2, 0.02]; % width, depth, height [m]
-friction_static = 0.7; % default 0.5
-friction_dynamic = 0.2; % default 0.3
+friction_static = 0.9; % default 0.5
+friction_dynamic = 0.4; % default 0.3
 radius_finger = 0.031; % [m]
 length_finger = 0.05; % [m] only for cylinder
 t_sample = 0.001; % [s]
@@ -147,8 +147,11 @@ plot(g_mat)
 ylabel('Error')
 xlabel('Time [ms]')
 
-%%
-% Estimate friction coefficients
+
+
+
+
+%% Estimate friction coefficients
 % x0 = [mu_s, mu_c, v0, nabla]
 %x0 = [0.5, 0.3, 0.01, 0.1]';
 bool = true;
@@ -156,8 +159,8 @@ bool = true;
 %1000, 6000
 % No downsampling: n_start 0 500, n_data = 4000
 
-n_data = 500;%length(F_normals)-300;
-n_start = 75;
+n_data = 1200;%length(F_normals)-300;
+n_start = 15;
 xdata = [F_normals(n_start:n_start+n_data,:), vel_tcp(n_start:n_start+n_data), F_frictions(n_start:n_start+n_data,:)];
 ydata = zeros(length(xdata),1);
 %options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt', 'FunctionTolerance', 1e-8 ,'PlotFcn', 'optimplotx','Diagnostics','on','Display','iter-detailed');%, 'MaxFunctionEvaluations', 5000)
@@ -192,14 +195,78 @@ end
 % Stribeck GUESSstimation: 0.0014
 % mu_str = vel_tcp(80)*sqrt(2);
 
+%% Determine start index
+
+diffs = diff(F_frictions);
+bool = true;
+cnt = 1;
+while abs(diffs(cnt)) > 0.01
+    cnt = cnt + 1;
+end
+
+while diffs(cnt) <= 0.1      
+    cnt = cnt + 1;
+end
+min_idx = cnt
+while diffs(cnt) > 0.01
+    cnt = cnt + 1;
+end
+max_idx = cnt
+
+
+
+%% Test code
+
+% Estimate friction coefficients
+x = [0 0 0 0]';
+for n_start = min_idx:max_idx
+
+    bool = true;
+
+    n_data = 400;%length(F_normals)-300;
+    %n_start = 45;
+    xdata = [F_normals(n_start:n_start+n_data,:), vel_tcp(n_start:n_start+n_data), F_frictions(n_start:n_start+n_data,:)];
+    ydata = zeros(length(xdata),1);
+
+    options = optimoptions('lsqcurvefit','Algorithm','trust-region-reflective', 'FunctionTolerance', 1e-8 ,'PlotFcn', 'optimplotx','Diagnostics','on','Display','iter-detailed');%, 'MaxFunctionEvaluations', 5000)
+
+    while bool
+        x0 = rand(4,1);
+        lb = [0.1 0.1 0 0];           % lower bound
+        ub = [2 2 10 0.1];        % upper bound
+        %F_n v F_fric
+
+        tic;
+        [x_, resnorm, residual, exitflag, output, lambda, jacobian] = lsqcurvefit(@g_func, x0, xdata, ydata, lb, ub, options);
+        display(toc)
+        display(x_)
+
+
+        if length(residual) > 1
+            %if logical(resnorm < 0.5) && logical(output.firstorderopt < 2e-04)
+            if logical(output.firstorderopt < 1e-03)
+                bool = false;
+                %display("resnorm: ")
+                %display(resnorm)
+                %display("first order opt: ")
+                %display(output.firstorderopt)
+            end
+        end
+
+    end
+    
+    x = x + x_;
+end
+x = x/(max_idx-min_idx+1)
+
 %% Method 2: Papers implementation of LM-method
 
-x0 = [0.9, 0.9, 0.001, 0.0];
+x0 = [0.1, 0.1, 0.001, 0.0];
 %x0 = rand(1,4);
 %F_n v F_fric
 
-n_data = 1000;%length(F_normals)-300;
-n_start = 300;
+n_data = 400;%length(F_normals)-300;
+n_start = 45;
 xdata = [F_normals(n_start:n_start+n_data,:), vel_tcp(n_start:n_start+n_data), F_frictions(n_start:n_start+n_data,:)];
 %[x_, resnorm, residual, exitflag, output, lambda, jacobian] = lsqcurvefit(@LM_func, x0, xdata, ydata, lb, ub, options);
 [P, error] = LM_func(x0, xdata);

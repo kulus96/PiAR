@@ -7,7 +7,7 @@
 % Load finger tip sketch
 load('../simulation/quarter_circle.mat')
 
-time_simulation = 4; % [s]
+time_simulation = 10.5; % [s]
 g_0 = 0; % -9.82;
 dim_block = [0.7, 0.2, 0.02]; % width, depth, height [m]
 friction_static = 0.5; % default 0.5
@@ -22,11 +22,11 @@ robot_width = 0.6; % [m]
 size_strut = 45 * 10^-3; % [m]
 revolute_y = pi/4; % [rad]
 revolute_x = 0; % [rad]
-
-climit = 5; % 'threshold for cusum'
+F_push = -10; %-2
+climit = 28; % 'threshold for cusum'
 
 %% Load data
-%out = sim('../simulation/finger', time_simulation);
+out = sim('../simulation/finger', time_simulation);
 %%
 torque_sensor = out.Torque;
 force_sensor = out.Force;
