@@ -164,7 +164,7 @@ n_start = 15;
 xdata = [F_normals(n_start:n_start+n_data,:), vel_tcp(n_start:n_start+n_data), F_frictions(n_start:n_start+n_data,:)];
 ydata = zeros(length(xdata),1);
 %options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt', 'FunctionTolerance', 1e-8 ,'PlotFcn', 'optimplotx','Diagnostics','on','Display','iter-detailed');%, 'MaxFunctionEvaluations', 5000)
-    
+
 options = optimoptions('lsqcurvefit','Algorithm','trust-region-reflective', 'FunctionTolerance', 1e-8 ,'PlotFcn', 'optimplotx','Diagnostics','on','Display','iter-detailed');%, 'MaxFunctionEvaluations', 5000)
 
 while bool
@@ -172,12 +172,12 @@ while bool
     lb = [0.1 0.1 0 0];           % lower bound
     ub = [2 2 10 0.1];        % upper bound
     %F_n v F_fric
-   
+
     tic;
     [x_, resnorm, residual, exitflag, output, lambda, jacobian] = lsqcurvefit(@g_func, x0, xdata, ydata, lb, ub, options);
     display(toc)
     display(x_)
-    
+
     %resnorm(end)
     if length(residual) > 1
         %if logical(resnorm < 0.5) && logical(output.firstorderopt < 2e-04)
