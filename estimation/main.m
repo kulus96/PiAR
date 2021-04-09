@@ -9,8 +9,8 @@ load('../simulation/quarter_circle.mat')
 time_simulation = 10.5; % [s]
 g_0 = 0; % -9.82;
 dim_block = [0.7, 0.2, 0.02]; % width, depth, height [m]
-friction_static = 0.5; % default 0.5
-friction_dynamic = 0.3; % default 0.3
+friction_static = 0.7; % default 0.5
+friction_dynamic = 0.2; % default 0.3
 radius_finger = 0.031; % [m]
 length_finger = 0.05; % [m] only for cylinder
 t_sample = 0.001; % [s]
@@ -22,7 +22,7 @@ size_strut = 45 * 10^-3; % [m]
 revolute_y = pi/4; % [rad]
 revolute_x = 0; % [rad]
 
-F_push = -2;
+F_push = -10;
 climit = 28; % 'threshold for cusum'
 
 %% Run simulation
@@ -148,26 +148,39 @@ plot(g_mat)
 ylabel('Error')
 xlabel('Time [ms]')
 
-%%
-% Estimate friction coefficients
-% x0 = [mu_s, mu_c, v0, nabla]
-x0 = [0.5, 0.3, 0.01, 0.1]';
-%F_n v F_fric
 
-n_data = 20;
-n_start = 550;
-xdata = [F_normals(n_start:n_start+n_data,:), vel_tcp(n_start:n_start+n_data), F_frictions(n_start:n_start+n_data,:)];
-ydata = zeros(length(xdata),1);
-options = optimoptions('lsqcurvefit','Algorithm','levenberg-marquardt','PlotFcn', 'optimplotx','Diagnostics','on','Display','iter-detailed');%, 'MaxIterations', 100)
-lb = []; % lower bound
-ub = []; % upper bound
-tic;
-[x_, resnorm, residual, exitflag, output, lambda, jacobian] = lsqcurvefit(@g_func, x0, xdata, ydata, lb, ub, options);
-display(toc)
-display(x_)
+%% Estimate friction coefficients
+% x0 = [mu_s, mu_c, v0, nabla]
 
 % Stribeck GUESSstimation: 0.0014
 % mu_str = vel_tcp(80)*sqrt(2);
+
+bool = true;
+while bool
+    x0 = rand(4,1);
+    %F_n v F_fric
+
+    n_data = 200; %length(F_normals)-300;
+    n_start = 35;
+    xdata = [F_normals(n_start:n_start+n_data,:), vel_tcp(n_start:n_start+n_data), F_frictions(n_start:n_start+n_data,:)];
+    ydata = zeros(length(xdata),1);
+    options = optimoptions('lsqcurvefit','Algorithm','trust-region-reflective', 'FunctionTolerance', 1e-8 ,'PlotFcn', 'optimplotx','Diagnostics','on','Display','iter-detailed');%, 'MaxFunctionEvaluations', 5000)
+    lb = [0.01 0.01 0 0]; % lower bound
+    ub = [2 2 10 0.1];    % upper bound
+    
+    tic;
+    [x_, resnorm, residual, exitflag, output, lambda, jacobian] = lsqcurvefit(@g_func, x0, xdata, ydata, lb, ub, options);
+    display(toc)
+    display(x_)
+
+    %resnorm(end)
+    if length(residual) > 1
+        if logical(resnorm < 2) && logical(output.firstorderopt < 0.03) %logical(resnorm < 0.2) && 
+            bool = false;
+        end
+    end
+    %bool = false
+end
 
 %% Method 2: Papers implementation of LM-method
 
