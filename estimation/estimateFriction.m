@@ -1,7 +1,10 @@
-function [F_normal, F_friction, F_friction2] = estimateFriction(P_c, F, S)
-    syms x y z
-    p_vec= [x,y,z]';
-    Q = double(subs(gradient(S(p_vec)),[x,y,z],[P_c(1), P_c(2),P_c(3)]));
+%function [F_normal, F_friction, F_friction2] = estimateFriction(P_c, F, S)
+function [F_normal, F_friction, F_friction2] = estimateFriction(P_c, F)
+    %syms x y z
+    %p_vec= [x,y,z]';
+    %Q = double(subs(gradient(S(p_vec)),[x,y,z],[P_c(1), P_c(2),P_c(3)]));
+    Q = double(2.* P_c);
+    
     a = (Q'*F)/(Q'*Q);
     F_normal = a*Q;
     cos_theta = norm(F_normal)/(norm(F));

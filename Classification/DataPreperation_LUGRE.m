@@ -2,7 +2,7 @@ clear; clc;
 addpath("./../estimation")
 % load data
 files = dir('../estimation/rawData/*.mat');
-
+%strcat(files(1).folder,'/', files(1).name)
 
 % Collum = [Static, dynamiv, Stribeck vel, viscosity ]
 SURFACE_PROPERTIES =[]; 
@@ -11,12 +11,12 @@ GT_DYNAMIC =[];
 LABEL = [];
 
 % Data variation parameters
-n_samples_pr_class = 2;
+n_samples_pr_class = 10;
 noise_std =0;
 
 for i = 1:size(files,1)
     % load data
-    [forces_tcp, moments_tcp, vel_tcp, F_friction_GT, F_normal_GT, mu_static_GT, mu_dyn_GT, label] = loadRawData(strcat(files(i).folder,'/', files(i).name), 8, true);
+    [forces_tcp, moments_tcp, vel_tcp, F_friction_GT, F_normal_GT, mu_static_GT, mu_dyn_GT, label] = loadRawData(strcat(files(i).folder,'/', files(i).name), 8, 0);
     % resample 
     for k = 1:n_samples_pr_class
         % estimate model param
@@ -31,4 +31,6 @@ for i = 1:size(files,1)
     end
 end
 
+%%
+classificationLearner(SURFACE_PROPERTIES, LABEL)
 
