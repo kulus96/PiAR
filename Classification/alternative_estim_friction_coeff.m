@@ -56,15 +56,14 @@ for i = 1: size(files,1)-1
 		train_VEL_temp = VEL(random_index:random_index+window_size-1,i);
 		temp_data =  [reshape(train_FORCES_temp,[],1); reshape(train_TORQUES_temp,[],1); train_VEL_temp];
 		train_data_input =  [train_data_input temp_data];
-
 	end
 end
 train_data_output = train_data_output';
 
 
 
-load('network_dense.mat')
-surface_prop_nn = net(train_data_input)';
+%load('network_dense.mat')
+%surface_prop_nn = net(train_data_input)';
 
 
 %% Neural net Dense

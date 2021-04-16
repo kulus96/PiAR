@@ -25,9 +25,6 @@ fp = length(performance)-tp;
 accuracy = tp/length(performance)
 
 %%
-
-
-
 X = surface_properties;
 
 % setup Y
@@ -39,7 +36,6 @@ end
 Mdl = fitcecoc(X,Y);
 %%
 classificationLearner(X,Y);
-
 
 % classificationLearner(X,Y) opens the Classification Learner app and populates
 % the New Session from Arguments dialog box with the n-by-p predictor matrix X
