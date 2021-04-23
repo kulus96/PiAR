@@ -1,4 +1,4 @@
-function [g_mat] = g_func(x0, xdata)
+    function [g_mat] = g_func(x0, xdata)
 %     syms mu_s mu_c v0 nabla F_n v F_fric
 %
 %     E = mu_c + (mu_s - mu_c)*exp(-(v/v0)^2) + nabla*(v/F_n) - F_fric/F_n;

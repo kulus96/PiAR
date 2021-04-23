@@ -12,11 +12,11 @@ LABEL = [];
 
 % Data variation parameters
 n_samples_pr_class = 10;
-noise_std =0;
+noise_std =0.01;
 
 for i = 1:size(files,1)
     % load data
-    [forces_tcp, moments_tcp, vel_tcp, F_friction_GT, F_normal_GT, mu_static_GT, mu_dyn_GT, label] = loadRawData(strcat(files(i).folder,'/', files(i).name), 8, 0);
+    [forces_tcp, moments_tcp, vel_tcp, F_friction_GT, F_normal_GT, mu_static_GT, mu_dyn_GT, label] = loadRawData(strcat(files(i).folder,'/', files(i).name), 8, 1);
     % resample 
     for k = 1:n_samples_pr_class
         % estimate model param
@@ -32,5 +32,5 @@ for i = 1:size(files,1)
 end
 
 %%
-classificationLearner(SURFACE_PROPERTIES, LABEL)
+%classificationLearner(SURFACE_PROPERTIES, LABEL)
 

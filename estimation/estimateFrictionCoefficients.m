@@ -35,13 +35,17 @@ function [mu_static, mu_dynamic, stribeck, nabla] = estimateFrictionCoefficients
         x0 = [[0;0;10.0]; k_sph]; % Initial guess
         xdata = [f;m];
         
+        k_sph;
+        G(x0, xdata);
+        
+        
         %[x,~,residual,exitflag,output,lambda,jacobian] = lsqcurvefit(g,x0,xdata, ydata, [], [], options);
         [x,~,residual,exitflag,output,lambda,jacobian] = lsqcurvefit(@G,x0,xdata, ydata, [], [], options);
         
         % Estimate friction force
-        P_c = [x(1),x(2),x(3)]';
+        P_c = [x(1),x(2),x(3)]'
         %[F_normal, F_friction, F_friction2] = estimateFriction(P_c,f,S);
-        [F_normal, F_friction, F_friction2] = estimateFriction(P_c,f);
+        [F_normal, F_friction, F_friction2] = estimateFriction(P_c,f)
         F_normals(i) = norm(F_normal);
         F_frictions(i) = norm(F_friction);
     end

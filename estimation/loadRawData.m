@@ -17,7 +17,7 @@ function [force, torque, vel, friction_GT, normal_GT, mu_static, mu_dyn, label] 
 	torque = data.torque(1:down_sample:end,:)';
 
 	mean = 0;
-	std = 0.25;
+	std = 0.003;
 
 	if with_noise
 		% with noise on forceTorque sensor
