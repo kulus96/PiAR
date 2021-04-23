@@ -7,6 +7,8 @@
 # Directories
 data
 slprj
+realData
+*/.idea/*
 
 # For Macs
 *.DS_Store
