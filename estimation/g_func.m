@@ -18,6 +18,8 @@
     Fn = xdata(:,1);
     v = xdata(:,2);
     F = xdata(:,3);
+    
+    
 
     g_mat = zeros(length(xdata),1);
     for i =1:length(xdata)
