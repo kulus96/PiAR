@@ -1,8 +1,11 @@
-from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import GaussianNB
 from sklearn import svm
 from sklearn.ensemble import BaggingClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import cross_val_score
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.tree import DecisionTreeClassifier
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
@@ -34,14 +37,20 @@ class Classifier:
         self.y_train = []
         self.y_test = []
 
-        if method_name == "GNB" :
+        if method_name == "GNB":
             self.model = GaussianNB()
         elif method_name == "SVM_poly":
-            self.model = svm.SVC(kernel='poly')
+            self.model = svm.SVC(kernel='poly',degree=5)
         elif method_name == "SVM_linear":
             self.model = svm.SVC(kernel='linear')
         elif method_name == "Bagging":
-            self.model = BaggingClassifier(base_estimator=svm.SVC(),n_estimators=10, random_state=0)
+            self.model = BaggingClassifier(base_estimator=svm.SVC(), n_estimators=10, random_state=0)
+        elif method_name == "k-nearest neighbors":
+            self.model = KNeighborsClassifier(n_neighbors=14)
+        elif method_name == "LDA":
+            self.model = LinearDiscriminantAnalysis()
+        elif method_name == "DTC":
+            self.model = DecisionTreeClassifier(random_state=0)
 
     def split_data(self,data_x,data_y,test_size):
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(data_x, data_y, test_size=test_size, random_state=0)
@@ -49,16 +58,42 @@ class Classifier:
     def fit_data(self):
         self.model.fit(self.X_train, self.y_train)
 
-    def predict(self,data):
+    def predict(self, data):
         return self.model.predict(data)
+
+def test_of_classifier(X,y,method_name,test_data_size):
+
+    model = Classifier(method_name)
+    model.split_data(X, y, test_data_size)
+    model.fit_data()
+    y_pred = model.predict(model.X_test)
+
+    print(model.method_name,
+          " : Number of mislabeled points out of a total %d points : %d" % (model.X_test.shape[0],
+                                                                            (model.y_test != y_pred).sum()))
+    scores = cross_val_score(model.model, X, y, cv=5)
+    print(model.method_name,
+          " : %0.2f accuracy with a standard deviation of %0.2f" % (scores.mean(), scores.std()))
+
 
 
 ## Running Gaussian Naive Baysian
 X = load_csv("surface_properties.csv")
 y = load_csv("label.csv")
 
-test_data_size = 0.3
+test_data_size = 0.4
 
+methods = ["GNB", "SVM_poly", "SVM_linear", "Bagging", "k-nearest neighbors", "LDA", "DTC"]
+
+for names in methods:
+    test_of_classifier(X, y, names,test_data_size)
+
+
+
+
+
+
+"""
 C_GNB = Classifier("GNB")
 C_GNB.split_data(X,y,test_data_size)
 C_GNB.fit_data()
@@ -66,6 +101,8 @@ y_pred = C_GNB.predict(C_GNB.X_test)
 
 print(C_GNB.method_name," : Number of mislabeled points out of a total %d points : %d" % (C_GNB.X_test.shape[0],
                                                                                           (C_GNB.y_test != y_pred).sum()))
+clf = svm.SVC(kernel='linear', C=1, random_state=42)
+scores = cross_val_score(clf, X, y, cv=5)
 C_SVM_poly = Classifier("SVM_poly")
 C_SVM_poly.split_data(X,y,test_data_size)
 C_SVM_poly.fit_data()
@@ -103,7 +140,7 @@ ax.set_xlabel("static friction")
 ax.set_ylabel("dynamic friction")
 plt.show()
 
-
+"""
 
 
 
