@@ -1,4 +1,6 @@
 # Specific files ##
+*.csv
+*.npy
 *.asv
 *.slxc
 *.autosave
