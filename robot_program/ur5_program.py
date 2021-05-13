@@ -67,7 +67,7 @@ class Robot:
         self.contactThres = 4
 
         # Force controller
-        self.kF = 10**(-5) #0.0002 #10**(-7) #10**(-5)     # [m/N]
+        self.kF = 0.00002 #10**(-7) #10**(-5)     # [m/N]
         self.dF = 0#10**(-5)/20 #self.kF * 15
         self.iF = 0#1*10**(-7)*0.6 #self.kF * 0.6 #10**(-2)
         self.prevForce = 0
@@ -75,13 +75,15 @@ class Robot:
 
         # Sensor data
         self.FTMeasurements = []
-        self.activeFMeasurement = [] #[0]
+        self.activeFMeasurement = [0] #[0]
         self.TCPPoses = []
         self.axes = np.array([[0], [1], [2]]) #x,y,z
 
         #Filter setup
-        self.b = signal.firwin(numtaps = 50, cutoff= 1, fs = 500)
+        self.fc_f = 1 # [Hz]
+        self.b = signal.firwin(numtaps = 50, cutoff= self.fc_f, fs = 500)
         self.z = signal.lfilter_zi(self.b, 1)
+        self.LPF_alpha_f = calculate_lpf_alpha(self.fc_f, self.sampleTime)
 
 
     def collectRawFTdata(self):
@@ -125,10 +127,6 @@ class Robot:
         normal_cutoff = cutoff / nyq
         b, a = butter(order, normal_cutoff, btype='lowpass', analog=False, output='ba')
         return b, a
-
-
-
-
 
     def collisionDetection(self, _axis = axis.z):
         currentForce = self.interface.getActualTCPForce()[2]
@@ -178,6 +176,7 @@ class Robot:
         return distX/nSteps, distY/nSteps, nSteps
 
     def swipe(self, pose, dPose, dVel, dForce, stepX, stepY, force_axis=axis.z):
+
         swipeAcc = 1.2
 
         cf = self.forceControl(dForce, _axis=force_axis)
@@ -186,13 +185,12 @@ class Robot:
         pose[1] += 0 #stepY
         pose[2] -= cf
 
-        robot.control.servoL(pose, dVel, swipeAcc, self.sampleTime, 0.03, 2000) #600)
+        robot.control.servoL(pose, 0, 0, self.sampleTime, 0.03, 2000) #600)
         return pose
 
     def forceControl(self, dForce, _axis=axis.z):
-        fc_f = 1 # [Hz]
-        #LPF_alpha_f = calculate_lpf_alpha(fc_f, self.sampleTime)
-        #filtered_force = lp_filter(self.activeFMeasurement[-1], self.activeFMeasurement[-2], LPF_alpha_f)
+
+        #filtered_force = lp_filter(self.activeFMeasurement[-1], self.activeFMeasurement[-2], self.LPF_alpha_f)
 
         #b,a = self.butter_lowpass(2, self.sampleFreq, 1)
         #filtered_force = lfilter(b, a, self.activeFMeasurement)
@@ -203,19 +201,14 @@ class Robot:
         deltaFT = dForce - currForce
 
         proportional = deltaFT * self.kF
-        derivative = (deltaFT - self.prevForce) * self.dF
-        integral = (self.prevIntegral + deltaFT * self.sampleTime) * self.iF
-        controlSignal = proportional + derivative + integral
+        #derivative = (deltaFT - self.prevForce) * self.dF
+        #integral = (self.prevIntegral + deltaFT * self.sampleTime) * self.iF
+        controlSignal = proportional# + derivative + integral
 
-
-        test_array1.append(self.activeFMeasurement)
-        test_array2.append(filtered_force[-1])
-        test_array4.append(deltaFT)
-        test_array5.append(integral)
-        test_array3.append(controlSignal)
+        #test_array2.append(filtered_force)
 
         # save prev deltaFT
-        self.prevIntegral = integral
+        #self.prevIntegral = integral
         self.prevForce = deltaFT
 
         return controlSignal
@@ -253,37 +246,37 @@ def runForceController(robot, desiredVel, startPos, endPos, sampleTime, desiredF
     try:
         #for i in range(nSteps):
         while(True):
-            start = time.time()
-            temp = robot.interface.getActualTCPPose()
-            test_array6.append(temp[:3])
+            start = time.perf_counter()
+            #temp = robot.interface.getActualTCPPose()
+            #test_array6.append(temp[:3])
             robot.collectRawFTdata()
-            nextPose = robot.swipe(nextPose, endPos, desiredVel, desiredForce, stepX, stepY, axis.z)
-            dur = time.time() - start
+            robot.swipe(nextPose, endPos, desiredVel, desiredForce, stepX, stepY, axis.z)
+            dur = time.perf_counter() - start
             if dur < sampleTime:
                 time.sleep(sampleTime - dur)
+
+
     except KeyboardInterrupt:
         robot.control.servoStop()
         robot.control.speedStop()
 
-        fig, ax = plt.subplots(5)
-        ax[0].plot(range(len(test_array1[-1])),test_array1[-1]) # unfiltered force
-        #ax[1].plot(range(len(test_array2[-1])),test_array2[-1]) # filtered force
-        ax[1].plot(range(len(test_array2)),test_array2) # filtered force
-        ax[2].plot(range(len(test_array3[1:])),test_array3[1:])         # controlSignal
-        ax[3].plot(range(len(test_array4)),test_array4)         # deltaFT
-        ax[4].plot(range(len(test_array6)), test_array6,label = ['x','y','z'])
+        fig, ax = plt.subplots(1)
+        #ax[0].plot(range(len(test_array1[-1])),test_array1[-1]) # unfiltered force
+        ax.plot(range(len(test_array2)),test_array2) # filtered force
+        #ax[1].plot(range(len(test_array2)),test_array2) # filtered force
+        #ax[2].plot(range(len(test_array3[1:])),test_array3[1:])         # controlSignal
+        #ax[3].plot(range(len(test_array4)),test_array4)         # deltaFT
+        #ax[4].plot(range(len(test_array6)), test_array6,label = ['x','y','z'])
         plt.show()
 
-    fig, ax = plt.subplots(5)
-    ax[0].plot(range(len(test_array1[-1])), test_array1[-1])    # unfiltered force
-    #ax[1].plot(range(len(test_array2[-1])), test_array2[-1]) # filtered force
-    ax[1].plot(range(len(test_array2)),test_array2) # filtered force
-    ax[2].plot(range(len(test_array3[1:])), test_array3[1:])    # controlSignal
-    ax[3].plot(range(len(test_array4)), test_array4)            # deltaFT
-    #ax[4].plot(range(len(test_array5)), test_array5)            # integral
-    ax[4].plot(range(len(test_array6)), test_array6,label = ['x','y','z'])
-                # TCP
-    plt.show()
+    #fig, ax = plt.subplots(5)
+    #ax[0].plot(range(len(test_array1[-1])),test_array1[-1]) # unfiltered force
+    #ax[1].plot(range(len(test_array2[-1])),test_array2[-1]) # filtered force
+    #ax[1].plot(range(len(test_array2)),test_array2) # filtered force
+    #ax[2].plot(range(len(test_array3[1:])),test_array3[1:])         # controlSignal
+    #ax[3].plot(range(len(test_array4)),test_array4)         # deltaFT
+    #ax[4].plot(range(len(test_array6)), test_array6,label = ['x','y','z'])
+    #plt.show()
 
 if __name__ == '__main__':
     ip = "192.168.1.130" # ip for main
@@ -296,7 +289,7 @@ if __name__ == '__main__':
     desiredOrientation = R.from_euler('xyz', [np.pi, 0, 0]).as_rotvec()
     desiredVel = 0.1   # [m/s]
     desiredAcc = 0.5 #1.2  # [m/s^2]
-    desiredForce = 1 # [N] (1.8N is almost equal to the real zero)
+    desiredForce = 5 # [N] (1.8N is almost equal to the real zero)
 
     # Collision detection
     collisionVel = 0.05  # [m/s]
@@ -308,6 +301,7 @@ if __name__ == '__main__':
 
     # Resetting sensors
     robot.control.zeroFtSensor()
+    time.sleep(0.5)
 
     # Set positions
     homePos, startPos, endPos = robot.setPositions(desiredOrientation)
@@ -317,14 +311,14 @@ if __name__ == '__main__':
     startPos[2] -= 0.1  # [m] offset
 
     # Starting collision detection
-    print("Run collision detection")
+    #print("Run collision detection")
     #runCollisionDetection(robot, startPos, collisionVel, collisionAcc, sampleTime)
-    input("Press Enter to continue.")
+    #input("Press Enter to continue.")
 
     # Release force
     startPos[2] += 0.1  # [m]
     #runReleaseForce(robot, startPos, releaseVel, releaseAcc, sampleTime, desiredForce)
-    print("Force released")
+    #sprint("Force released")
     input("Press Enter to continue.")
 
 
