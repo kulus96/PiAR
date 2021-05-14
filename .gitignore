@@ -3,6 +3,11 @@
 *.slxc
 *.autosave
 *.mat
+*.npy
+*.csv
+*.pyc
+*.txt
+*.png
 
 # Directories
 data

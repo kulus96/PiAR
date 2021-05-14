@@ -6,9 +6,17 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import cross_val_score
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
+
 
 def load_csv(file_name):
     with open(file_name) as csv_file:
@@ -40,17 +48,26 @@ class Classifier:
         if method_name == "GNB":
             self.model = GaussianNB()
         elif method_name == "SVM_poly":
-            self.model = svm.SVC(kernel='poly',degree=5)
+            self.model = svm.SVC(kernel='poly', degree=9)
         elif method_name == "SVM_linear":
             self.model = svm.SVC(kernel='linear')
         elif method_name == "Bagging":
             self.model = BaggingClassifier(base_estimator=svm.SVC(), n_estimators=10, random_state=0)
         elif method_name == "k-nearest neighbors":
-            self.model = KNeighborsClassifier(n_neighbors=14)
+            self.model = KNeighborsClassifier(n_neighbors=3)    # Lower n_neighbors is better
         elif method_name == "LDA":
-            self.model = LinearDiscriminantAnalysis()
+            self.model = LinearDiscriminantAnalysis(solver='lsqr')
         elif method_name == "DTC":
             self.model = DecisionTreeClassifier(random_state=0)
+        elif method_name == "AdaBoostClassifier":
+            self.model = AdaBoostClassifier(n_estimators=50, random_state=False, learning_rate=0.5)
+        elif method_name == "RandomForest":
+            self.model = RandomForestClassifier()
+        elif method_name == "GPC":
+            self.model = GaussianProcessClassifier(max_iter_predict=100)
+        elif method_name == "MLP":
+            self.model = MLPClassifier(hidden_layer_sizes=100, activation='relu', solver='adam', learning_rate='constant', learning_rate_init=0.01, max_iter=10000)
+
 
     def split_data(self,data_x,data_y,test_size):
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(data_x, data_y, test_size=test_size, random_state=0)
@@ -71,24 +88,45 @@ def test_of_classifier(X,y,method_name,test_data_size):
     print(model.method_name,
           " : Number of mislabeled points out of a total %d points : %d" % (model.X_test.shape[0],
                                                                             (model.y_test != y_pred).sum()))
-    scores = cross_val_score(model.model, X, y, cv=5)
+    scores = cross_val_score(model.model, model.X_test, model.y_test, cv=2)
+    #print(scores)
     print(model.method_name,
           " : %0.2f accuracy with a standard deviation of %0.2f" % (scores.mean(), scores.std()))
 
+    return scores, scores.mean(), scores.std(), model.X_test.shape[0], (model.y_test != y_pred).sum()
+
+    #confusion_mat = confusion_matrix(model.y_test, y_pred)
+    #report = classification_report(model.y_test, y_pred)
+
+    #print(confusion_mat)
+    #print(report)
+    print()
 
 
+'''
 ## Running Gaussian Naive Baysian
 X = load_csv("surface_properties.csv")
 y = load_csv("label.csv")
 
-test_data_size = 0.4
+#X = load_csv("C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Git/PiAR/Python_estimation/coefficients.csv")
+#y = load_csv("C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Git/PiAR/Python_estimation/labels.csv")
 
-methods = ["GNB", "SVM_poly", "SVM_linear", "Bagging", "k-nearest neighbors", "LDA", "DTC"]
+
+
+test_data_size = 0.5
+
+for i in range(len(X)):
+    X[i][0] += np.random.normal(0, 0.05)
+    X[i][1] += np.random.normal(0, 0.05)
+
+
+#methods = ["GNB", "SVM_poly", "SVM_linear", "Bagging", "k-nearest neighbors", "LDA", "DTC"]
+methods = ["GNB", "SVM_poly", "SVM_linear", "k-nearest neighbors", "LDA", "DTC", "AdaBoostClassifier", "RandomForest", "GPC", "MLP"]
 
 for names in methods:
     test_of_classifier(X, y, names,test_data_size)
 
-
+'''
 
 
 
