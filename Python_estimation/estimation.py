@@ -2,7 +2,7 @@ import numpy as np
 import math
 import scipy.io
 import matplotlib.pyplot as plt
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares, minimize
 from scipy.optimize import Bounds
 from random import uniform
 import os
@@ -16,39 +16,33 @@ def main(forces_tcp, moments_tcp,vel_tcp):
     r = 31 * pow(10,-3) # radius of finder [m]
     A = np.eye(3)
     dz = 0
-
-
     length = forces_tcp.shape[1]
+    F_normals = np.zeros((length, 1))
+    F_frictions = np.zeros((length, 1))
 
-    F_normals = np.zeros((length,1))
-    F_frictions = np.zeros((length,1))
+    x0 = np.hstack((np.array([0, 0, r]), np.random.uniform(-100, 100)))
 
     for i in range(length):
-        f = forces_tcp[:,i]
-        m = moments_tcp[:,i]
+        f = forces_tcp[:, i]
+        m = moments_tcp[:, i]
 
-        [c_sph, k_sph] = contactCentroidEstimation(A, r, f, m)
+        xdata = np.hstack((f, m))
 
-        x0 = np.hstack((np.array([0, 0, r/2]),k_sph))
-        xdata = np.hstack((f,m))
-
-        #res = least_squares(G, x0, method='trf', bounds=([0,0,0,-np.inf], [r,r,r,np.inf]), verbose=0, args=xdata)
-        res = least_squares(G, x0, method='lm', xtol=1e-8, verbose=0, args=xdata)
-
+        bounds_min = [(-r, r), (r, r), (0, r), (-np.inf, np.inf)]
+        res = minimize(G, x0, args=(xdata[0], xdata[1], xdata[2], xdata[3], xdata[4], xdata[5]), bounds=bounds_min,
+                       constraints={'type': 'eq', 'fun': S})
+        x0 = res.x
         F_normal, F_friction = estimateFrictionForces(res.x[0:3], f)
         F_normals[i] = np.linalg.norm(F_normal)
         F_frictions[i] = np.linalg.norm(F_friction)
 
     min_idx, max_idx = startIndex(F_frictions)
 
-    tic = time.perf_counter()
     x = estimateFrictionCoefficients(F_normals, vel_tcp, F_frictions, min_idx, max_idx)
-    toc = time.perf_counter()
-
     return x
 
+
 def jac(x0, F_n, v, F):
-    #J = np.empty((4,len(F)))
     mu_s = x0[0]
     mu_c = x0[1]
     v0 = x0[2]
@@ -64,20 +58,10 @@ def jac(x0, F_n, v, F):
 
 def estimateFrictionCoefficients(F_normals, vel_tcp, F_frictions, min_idx, max_idx):
     x = [0, 0, 0, 0]
-    x_prev = 0
-    x_diff = []
-    x_coeffs1 = []
-    x_coeffs2 = []
-    x_coeffs3 = []
-    x_coeffs4 = []
-    optimality = []
-    cost = []
-    gradient = []
-
     for n_start in range(min_idx, max_idx + 1, 2):
         bool = True
 
-        n_data = 400 #400
+        n_data = 400
         xdata = [F_normals[n_start:n_start + n_data], vel_tcp[n_start:n_start + n_data],F_frictions[n_start:n_start + n_data]]
 
         bounds = ([0.1, 0.1, 0, 0], [2, 2, 10, 0.1])
@@ -94,22 +78,10 @@ def estimateFrictionCoefficients(F_normals, vel_tcp, F_frictions, min_idx, max_i
             if res.optimality < 1e-01:
                 bool = False
             cnt += 1
-            #print(cnt)
-            if cnt > 1000:
+            if cnt > 50:
                 bool = False
 
         x = x + res.x
-
-        x_diff.append(np.linalg.norm(res.x-x_prev))
-        x_coeffs1.append(res.x[0])
-        x_coeffs2.append(res.x[1])
-        x_coeffs3.append(res.x[2])
-        x_coeffs4.append(res.x[3])
-        x_prev = res.x
-        optimality.append(res.optimality)
-        cost.append(res.cost)
-        gradient.append(np.linalg.norm(res.grad))
-    #return x/(max_idx-min_idx+1)
     return x/(int(max_idx-min_idx)/2+1)
 
 def diff(array):
@@ -162,16 +134,17 @@ def S(p):
     r = 31*pow(10,-3)
     return pow(p[0], 2) + pow(p[1], 2) + pow((p[2]-dz), 2) - pow(r, 2)
 
-
 def G(x0, xdata1, xdata2, xdata3, xdata4, xdata5, xdata6):
     xdata = np.array((xdata1, xdata2, xdata3, xdata4, xdata5, xdata6))
 
     # Cannot take the gradient to a scalar?
+    S_grad = 2*x0[0] + 2*x0[1] + 2*x0[2]
     #y[1,1] = np.cross(xdata[0:3], x0[0:3]) + x0[3]*np.gradient(S(x0[0:3])) - xdata[4:6]
-    y1 = np.cross(xdata[0:3], x0[0:3]) - xdata[3:6]
-    y2 = S(x0[0:3])
-    y = np.hstack((y1,y2))
-    return y
+    y1 = np.cross(xdata[0:3], x0[0:3]) + x0[3]*S_grad - xdata[3:6]
+    #y2 = S(x0[0:3])
+    #y = np.hstack((y1,y2))
+
+    return 0.5 * np.transpose(y1) @ y1
 
 
 def estimateFrictionForces(P_c, F):
@@ -201,6 +174,17 @@ def g_func(x0, Fn, v, F):
 
     return g_mat.flatten()
 
+
+def filter(FMeasurement):
+    #Filter setup
+    fc_f = 1 # [Hz]
+    b = signal.firwin(numtaps = 50, cutoff= fc_f, fs = 500) # run once
+    z = signal.lfilter_zi(b, 1) # run once
+    filtered_force, z = signal.lfilter(b, 1, FMeasurement, zi=z) # run me
+
+    return filtered_force
+
+# The following methods are used for testing
 def classification_data():
     path = "C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Python_implementation/"
     data = ["hard_steel_on_hard_steel", "Mild_steel_on_mild_steel", "Mild_steel_on_lead", "Aluminum_on_mild_steel",
@@ -217,10 +201,8 @@ def classification_data():
     iterations_pr_sample = 10
 
     for i in range(len(data)):
-    #for i in range(2):
         print("Iteration: ", i)
         for j in range(iterations_pr_sample):
-        #for j in range(2):
             forces_tcp = scipy.io.loadmat(path+"forces_tcp_"+data[i] + ".mat")
             moments_tcp = scipy.io.loadmat(path + "moments_tcp_" + data[i] + ".mat")
             vel_tcp = scipy.io.loadmat(path + "vel_tcp_" + data[i] + ".mat")
@@ -245,64 +227,11 @@ def classification_data():
 
     return np.asarray(coefficients), np.asarray(labels)
 
-def test_func():
-    path = "C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Python_implementation/"
-    data = ["hard_steel_on_hard_steel","Mild_steel_on_mild_steel", "Mild_steel_on_lead", "Aluminum_on_mild_steel", "Copper_on_mild_steel","Nickel_on_nickel", "Brass_on_mild_steel","Zinc_on_cast_iron", "Copper_on_cast_iron", "Aluminum_on_aluminum", "Glass_on_glass", "Oak_on_oak_(parallel_to_grain)", "Oak_on_oak_(perpendicular)","Leather_on_oak_(parallel)"]
-    mu_static_GT = [0.78, 0.74, 0.95, 0.61, 0.53, 1.10, 0.51, 0.85, 1.05, 1.05, 0.94, 0.62, 0.54, 0.61]
-    mu_dyn_GT =    [0.42, 0.57, 0.95, 0.47, 0.36, 0.53, 0.44, 0.21, 0.29, 1.40, 0.40, 0.48, 0.32, 0.52]
-
-    mu_static = []
-    mu_dyn = []
-    strib = []
-    visc = []
-    error_static = []
-    error_dyn = []
-
-    for i in range(len(mu_dyn_GT)):
-        print("Iteration: ", i)
-        forces_tcp = scipy.io.loadmat(path+"forces_tcp_"+data[i] + ".mat")
-        moments_tcp = scipy.io.loadmat(path + "moments_tcp_" + data[i] + ".mat")
-        vel_tcp = scipy.io.loadmat(path + "vel_tcp_" + data[i] + ".mat")
-
-        forces_tcp = forces_tcp['forces_tcp']
-        moments_tcp = moments_tcp['moments_tcp']
-        vel_tcp = vel_tcp['vel_tcp']
-
-        #Noise
-        #for i in range(len(forces_tcp)):
-            #forces_tcp[i] += np.random.normal(0, 0.001)
-            #moments_tcp[i] += np.random.normal(0, 1e-5)
-            #vel_tcp[i] += np.random.normal(0, 0.01)
-
-        x = main(forces_tcp, moments_tcp, vel_tcp)
-        mu_static.append(x[0])
-        mu_dyn.append(x[1])
-        strib.append(x[2])
-        visc.append(x[3])
-        error_static.append(x[0] - mu_static_GT[i])
-        error_dyn.append(x[1] - mu_dyn_GT[i])
-
-
-    plt.figure(10)
-    plt.plot(range(len(mu_static)), error_static, label="mu_static error")
-    plt.plot(range(len(mu_dyn)), error_dyn, label="mu_dynamic error")
-    plt.legend()
-    #plt.show()
-    return 0
-
-def filter(FMeasurement):
-    #Filter setup
-    fc_f = 1 # [Hz]
-    b = signal.firwin(numtaps = 50, cutoff= fc_f, fs = 500) # run once
-    z = signal.lfilter_zi(b, 1) # run once
-    filtered_force, z = signal.lfilter(b, 1, FMeasurement, zi=z) # run me
-
-    return filtered_force
-
 def gen_surface_properties_from_folder():
-    path = "C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Git/PiAR/Python_estimation/Results/data_RW_pap/"
-    dir =  "C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Git/PiAR/Python_estimation/Results/"
-
+    #path = "C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Git/PiAR/Python_estimation/Results/data_RW_pap/"
+    #dir =  "C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Git/PiAR/Python_estimation/Results/"
+    path = "C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Git/PiAR/Python_estimation/Results/RW_data/New_Centroid_test/"
+    dir = "C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Git/PiAR/Python_estimation/Results/RW_data/Coefficients_new/"
 
     idx = 0
     cnt = 0
@@ -321,15 +250,27 @@ def gen_surface_properties_from_folder():
             with open(path + folder + '/' + filename, 'rb') as f:
                 data = np.load(f)
 
-            forces_tcp = np.transpose(data[0, :, 0:3])
-            moments_tcp = np.transpose(data[0, :, 3:6])
+            #forces_tcp = np.transpose(data[0, :, 0:3])
+            #moments_tcp = np.transpose(data[0, :, 3:6])
+            forces_tcp = np.transpose(data[3, :, 0:3])
+            moments_tcp = np.transpose(data[3, :, 3:6])
             vel_tcp = []
+            for i in range(forces_tcp.shape[1]):
+                vel_tcp.append(np.linalg.norm(data[1, i, 0:3]))
+
+            vel_tcp = np.asarray(vel_tcp).reshape((forces_tcp.shape[1], 1))
+
+            # Downsample
+            # n_down_sample = 1
+            # forces_tcp = forces_tcp[:, ::n_down_sample]
+            # moments_tcp = moments_tcp[:, ::n_down_sample]
+            # vel_tcp = vel_tcp[::n_down_sample, :]
 
             # Transform from base to tcp
-            rotm = R.from_rotvec(data[2, :, 3:6]).as_matrix()
-            for i in range(forces_tcp.shape[1]):
-                forces_tcp[:, i] = np.matmul(forces_tcp[:, i], rotm[i, :, :])
-                moments_tcp[:, i] = np.matmul(moments_tcp[:, i], rotm[i, :, :])
+            # rotm = R.from_rotvec(data[2, :, 3:6]).as_matrix()
+            # for i in range(forces_tcp.shape[1]):
+            #   forces_tcp[:, i] = np.matmul(forces_tcp[:, i], rotm[i, :, :])
+            #   moments_tcp[:, i] = np.matmul(moments_tcp[:, i], rotm[i, :, :])
 
             forces_tcp[0, :] = filter(forces_tcp[0, :])
             forces_tcp[1, :] = filter(forces_tcp[1, :])
@@ -339,15 +280,6 @@ def gen_surface_properties_from_folder():
             moments_tcp[1, :] = filter(moments_tcp[1, :])
             moments_tcp[2, :] = filter(moments_tcp[2, :])
 
-            #print(forces_tcp.shape)
-            #plt.plot(forces_tcp[2, :])
-            #plt.show()
-
-            for i in range(forces_tcp.shape[1]):
-                vel_tcp.append(np.linalg.norm(data[1, i, 0:3]))
-
-            vel_tcp = np.asarray(vel_tcp).reshape((forces_tcp.shape[1], 1))
-
             x = main(forces_tcp, moments_tcp, vel_tcp)
             mu_static.append(x[0])
             mu_dyn.append(x[1])
@@ -355,41 +287,18 @@ def gen_surface_properties_from_folder():
             visc.append(x[3])
             coefficients.append(x)
             labels.append(idx)
+            #print(mu_static)
+            #print(mu_dyn)
+        #plt.figure(3)
+        #plt.plot(mu_static, color='r')
+        #plt.plot(mu_dyn, color='b')
+        #plt.show()
         idx += 1
-        with open(dir + 'data_RW_estimation/' + 'coeff_' + folder + '.npy', 'wb') as f:
-            np.save(f, np.asarray(coefficients))
-        with open(dir + 'data_RW_estimation/' + 'labels_' + folder + '.npy', 'wb') as f:
-            np.save(f, np.asarray(labels))
+        with open(dir + 'coeff_' + folder + '.npy', 'wb') as f:
+           np.save(f, np.asarray(coefficients))
+        with open(dir + 'labels_' + folder + '.npy', 'wb') as f:
+           np.save(f, np.asarray(labels))
 
 
     return np.asarray(coefficients), np.asarray(labels)
 
-'''
-forces_tcp = scipy.io.loadmat('C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Python_implementation/forces_tcp_aluminum_on_aluminum.mat')
-moments_tcp = scipy.io.loadmat('C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Python_implementation/moments_tcp_aluminum_on_aluminum.mat')
-vel_tcp = scipy.io.loadmat('C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Python_implementation/vel_tcp_aluminum_on_aluminum.mat')
-
-forces_tcp = forces_tcp['forces_tcp']
-moments_tcp = moments_tcp['moments_tcp']
-vel_tcp = vel_tcp['vel_tcp']
-
-tic = time.perf_counter()
-#main(forces_tcp, moments_tcp, vel_tcp)
-#test_func()
-coefficients, labels = classification_data()
-
-print('labels: ', labels)
-
-
-
-np.savetxt('labels.csv', np.array(labels).astype(int), delimiter=',')
-np.savetxt('coefficients.csv', np.array(coefficients), delimiter=',')
-
-
-
-toc = time.perf_counter()
-
-
-print("Elapsed time of main: ", toc-tic)
-plt.show()
-'''
