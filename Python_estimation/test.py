@@ -140,12 +140,6 @@ def contact_centroid_estimation_simulation():
     mu_static_GT = [0.78, 0.74, 0.95, 0.61, 0.53, 1.10, 0.51, 0.85, 1.05, 1.05, 0.94, 0.62, 0.54, 0.61]
     mu_dyn_GT = [0.42, 0.57, 0.95, 0.47, 0.36, 0.53, 0.44, 0.21, 0.29, 1.40, 0.40, 0.48, 0.32, 0.52]
 
-    mu_static = []
-    mu_dyn = []
-    strib = []
-    visc = []
-    error_static = []
-    error_dyn = []
     centroids = []
     centroids_all = []
     K_spheres = []
@@ -187,19 +181,11 @@ def contact_centroid_estimation_simulation():
             K_spheres.append(K_sphere)
             centroids_all.append(res.x[0:3])
 
-
-
-        # centroids_external.append(np.sum(centroid_external,axis=0)/len(forces_tcp))
-        # centroids.append(np.sum(centroid,axis=0)/len(forces_tcp))
         centroids.append(res.x[0:3])
-        #centroids_labels.append(filename)
 
     centroids = np.asarray(centroids)
     K_spheres = np.asarray(K_spheres)
     centroids_all = np.asarray(centroids_all)
-    #centroids_labels = np.asarray(centroids_labels)
-
-
 
     with open(dir + 'contact_centroid_sim' + '.npy', 'wb') as f:
         np.save(f, centroids)
@@ -405,19 +391,5 @@ np_to_csv(path + 'coeff_Data_Pap.npy')
 np_to_csv(path + 'coeff_Data_Alu.npy')
 
 
-#surface_properties_data_test()
-#contact_centroid_estimation_test()
-#contact_centroid_estimation_simulation()
-#est.gen_surface_properties_from_folder()
-#classification_test()
-
-#contact_centroid_estimation_simulation()
-
-
-
-# path = 'C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Git/PiAR/Python_estimation/Results/RW_data/Coefficients/ALUMINIUM/coeffs/'
-#
-# for filename in os.listdir(path):
-#     np_to_csv(path + filename)
 
 

@@ -228,8 +228,6 @@ def classification_data():
     return np.asarray(coefficients), np.asarray(labels)
 
 def gen_surface_properties_from_folder():
-    #path = "C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Git/PiAR/Python_estimation/Results/data_RW_pap/"
-    #dir =  "C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Git/PiAR/Python_estimation/Results/"
     path = "C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Git/PiAR/Python_estimation/Results/RW_data/New_Centroid_test/"
     dir = "C:/Users/Andreas/Dropbox/8. semester/Project in Advanced Robotics/Git/PiAR/Python_estimation/Results/RW_data/Coefficients_new/"
 
@@ -287,12 +285,7 @@ def gen_surface_properties_from_folder():
             visc.append(x[3])
             coefficients.append(x)
             labels.append(idx)
-            #print(mu_static)
-            #print(mu_dyn)
-        #plt.figure(3)
-        #plt.plot(mu_static, color='r')
-        #plt.plot(mu_dyn, color='b')
-        #plt.show()
+
         idx += 1
         with open(dir + 'coeff_' + folder + '.npy', 'wb') as f:
            np.save(f, np.asarray(coefficients))
